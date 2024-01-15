@@ -8,7 +8,7 @@ We proposed the LTS dataset, covering a wide range of natural scenes. These vide
 
 ### Dataset Access
 The dataset is split into multiple parts and is accessible via Google Drive. Here are the links to download the dataset:
-- [Google Drive Link](Your_Google_Drive_Link)
+- [Google Drive Link](https://drive.google.com/drive/folders/1M3YsXmIBhsonYSMySTgI016kSXKwoV1j?usp=drive_link)
 
 ### Dataset Structure
 The dataset is organized in compressed files for convenient download:
