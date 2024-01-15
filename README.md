@@ -1,4 +1,4 @@
-# LTS: LLearning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation
+# LTS: Learning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation
 
 ## Introduction
 This repository hosts the dataset and model files for the LTS (Learning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation) approach, a novel method for moving object segmentation in videos using stationary cameras. Our method focuses on learning from diverse videos by capturing the similarities in temporal pixel distributions and refining segmentation through spatial correlation learning.
