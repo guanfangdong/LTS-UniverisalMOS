@@ -23,7 +23,7 @@ The dataset is organized in compressed files for convenient download:
 After downloading, extract the files to access the video data.
 
 ## Model
-We currently provide only the trained LTS model file, which has demonstrated state-of-the-art performance in moving object segmentation. At this stage, the model file is available for use, but please note that the accompanying inference and training code are still being refined and cleaned up for release.
+We currently provide the trained LTS model file. At this stage, the model file is available for use, but please note that the accompanying inference and training code are still being refined and cleaned up for release.
 
 ### Model File Structure
 - `/models`: Contains the LTS model file.
