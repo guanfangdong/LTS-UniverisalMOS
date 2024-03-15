@@ -1,10 +1,10 @@
 # LTS: Learning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation
 Click to watch LTS results on new LTS dataset!
-<a href="https://www.youtube.com/watch?v=BcLnNTne-n0">
-    <img src="https://i.imgur.com/LW93XnL.png" width="700">
-</a>
-
-
+<div align="center">
+    <a href="https://www.youtube.com/watch?v=BcLnNTne-n0">
+        <img src="https://i.imgur.com/LW93XnL.png" width="700" alt="video">
+    </a>
+</div>
 
 ## News 🎺🎺🎺
 ``March 15, 2024``
