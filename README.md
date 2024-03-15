@@ -30,10 +30,15 @@ The dataset is organized in compressed files for convenient download:
 After downloading, extract the files to access the video data.
 
 ## Model
-We currently provide the trained LTS model file. At this stage, the model file is available for use, but please note that the accompanying inference and training code are still being cleaned up for release.
+We currently provide the trained LTS model file. The model is located in the "models" folder. As our algorithm is universal, we do not require any retraining or fine-tuning to adapt to your model.
+
+We have utilized common libraries such as NumPy or Torch to ensure the code runs smoothly. If you encounter any issues with the code, please feel free to submit an issue in this GitHub repository or contact us directly.
 
 ### Model File Structure
-- `/models`: Contains the LTS model file.
+- `/models`: Contains the LTS model files.
+- `/data`: Contains the sample testing data.
+  - `/highway`: A sample video from CDNet2014 dataset.
+- `/deps`: Contains the custom dependencies.
 
 ## Progress Tracking
 
@@ -43,8 +48,8 @@ The table below summarizes the current progress and upcoming developments of the
 |---------------------------|--------|
 | Dataset Release           | ✔️     |
 | Model Weights Release     | ✔️     |
-| New ADNN Architecture     | ❌     |
-| Testing Procedure Release | ❌     |
+| New ADNN Architecture     | ✔️     |
+| Testing Procedure Release | ✔️     |
 | Training Procedure Release| ❌     |
 | UI Interface Development  | ❌     |
 
