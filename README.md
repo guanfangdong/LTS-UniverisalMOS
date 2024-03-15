@@ -1,5 +1,7 @@
 # LTS: Learning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation
 Click to watch LTS results on new LTS dataset!
+[![LTS Dataset](https://img.shields.io/badge/Click%20to%20watch-LTS%20results%20on%20new%20LTS%20dataset!-brightgreen)](链接到视频或数据集)
+
 <div align="center">
     <a href="https://www.youtube.com/watch?v=BcLnNTne-n0">
         <img src="https://i.imgur.com/LW93XnL.png" width="700" alt="video">
