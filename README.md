@@ -2,6 +2,10 @@
 
 ## News 🎺🎺🎺
 ``March 15, 2024``
+We have uploaded an .ipynb file for testing purposes, using the video "highway" from CDNet2014. As our algorithm is universial, we are preparing to upload another .ipynb file to test any video you have on hand.
+
+``March 06, 2024``
+We are pleased to announce that our paper has been accepted by **IEEE Transactions on Image Processing**. We are currently working with the editors on proofreading for the final public release. The arXiv version of the paper has also been updated. We will also be updating this GitHub repository accordingly.
 
 ## Introduction
 This repository hosts the dataset and model files for the LTS (Learning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation) approach, a novel method for moving object segmentation in videos using stationary cameras. Our method focuses on learning from diverse videos by capturing the similarities in temporal pixel distributions and refining segmentation through spatial correlation learning.
