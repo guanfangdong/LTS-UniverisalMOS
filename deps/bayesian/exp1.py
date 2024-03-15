@@ -1,0 +1,326 @@
+import sys
+
+# sys.path.append("/home/cqzhao/projects/matrix/")
+sys.path.append("D:/projects/matrix")
+import torch
+import os
+
+import imageio
+
+from common_py.dataIO import readImg_byFilesIdx
+from common_py.dataIO import loadFiles_plus
+
+from skimage import color
+
+import torch.nn.functional as F
+
+import matplotlib.pyplot as plt
+
+
+
+def img2pos(im):
+    row_im, column_im, byte_im = im.shape
+
+    re_pos = torch.abs(im - im)
+    re_pos = re_pos[:, :, 0:2]
+
+    for r in range(row_im):
+        for c in range(column_im):
+            re_pos[r, c, 0] = r
+            re_pos[r, c, 1] = c
+
+
+    return re_pos
+
+def rgb2lab(im):
+
+    im = im/255.0
+    lab = color.rgb2lab(im)
+
+    lab = torch.tensor( lab, dtype = torch.float )
+
+
+
+    return lab
+
+
+def isnan(x):
+    return x != x
+
+
+
+def bayesRefine(im, fgim, radius, rate):
+
+    row_im, column_im, byte_im = im.shape
+
+    lab = rgb2lab(im)
+    impos = img2pos(im)
+
+
+    row, column, byte = im.shape
+
+    features = torch.cat((im, im[:, :, 0:2]), dim = 2)
+    features[:, :, 0] = lab[:, :, 0]
+    features[:, :, 1] = lab[:, :, 1]
+    features[:, :, 2] = lab[:, :, 2]
+    features[:, :, 3] = impos[:, :, 0]
+    features[:, :, 4] = impos[:, :, 1]
+
+
+    [row_f, column_f, byte_f] = features.shape
+
+
+
+    ex_feats = F.pad(features.permute(2, 0, 1).unsqueeze(0), (radius, radius, radius, radius), mode='replicate').squeeze()
+    ex_feats = ex_feats.permute(1, 2, 0)
+
+    ex_label = F.pad(fgim.unsqueeze(-1).permute(2, 0, 1).unsqueeze(0), (radius, radius, radius, radius), mode='replicate').squeeze()
+    ex_label = ex_label
+
+
+    ex_image = F.pad(im.permute(2, 0, 1).unsqueeze(0), (radius, radius, radius, radius), mode='replicate').squeeze()
+    ex_image = ex_image.permute(1, 2, 0)
+
+
+#     print(ex_feats.shape)
+#     print(ex_label.shape)
+#     print(ex_image.shape)
+
+    num_feats = radius*2 + 1
+    num_feats = num_feats*num_feats
+
+#    print("num_feats = ", num_feats)
+
+    store_label = ex_label
+
+    cnt = 0
+    for i in range(radius, row_f + radius):
+
+        print("i = ", i)
+
+        for j in range(radius, column_f + radius):
+
+#            print("i,j:",i, j)
+
+            entim = ex_feats[i - radius:i + radius + 1, j - radius:j + radius + 1, :]
+            pixel = ex_feats[i, j, :]
+            pixel = pixel.squeeze()
+
+            label = ex_label[i - radius:i + radius + 1, j - radius:j + radius + 1]
+
+            vec_im = entim.reshape(num_feats, byte_f)
+            vec_lb = label.reshape(num_feats, 1)
+
+            midpos = round(num_feats/2)
+            vec_im = torch.cat((vec_im[0:midpos], vec_im[midpos + 1:num_feats]), dim = 0)
+            vec_lb = torch.cat((vec_lb[0:midpos], vec_lb[midpos + 1:num_feats]), dim = 0)
+
+            idx0 = vec_lb == 0
+            idx1 = vec_lb == 255
+            idx0 = idx0.squeeze()
+            idx1 = idx1.squeeze()
+
+            P0 = torch.sum(idx0).float()/(torch.sum(idx0) + torch.sum(idx1)).float()
+            P1 = torch.sum(idx1).float()/(torch.sum(idx0) + torch.sum(idx1)).float()
+
+
+#             if (P0 == 0) and (P1 == 0):
+#                 print("P0:", P0)
+#                 print("P1:", P1)
+#
+#                 print(vec_lb)
+#
+#                 print(idx0)
+#                 print(idx1)
+#
+#
+#                 print(torch.sum(idx0)/(torch.sum(idx0) + torch.sum(idx1)))
+#                 print(torch.sum(idx1)/(torch.sum(idx0) + torch.sum(idx1)))
+#
+#                 print(torch.sum(idx0)*1.0/(torch.sum(idx0) + torch.sum(idx1))*1.0 )
+#                 print(torch.sum(idx1)*1.0/(torch.sum(idx0) + torch.sum(idx1))*1.0 )
+#
+#                 print(torch.sum(idx0).float()/(torch.sum(idx0) + torch.sum(idx1)).float() )
+#                 print(torch.sum(idx1).float()/(torch.sum(idx0) + torch.sum(idx1)).float() )
+#
+
+
+
+
+#                 t = input()
+
+#             print("P0:", P0)
+#             print("P1:", P1)
+
+            if (P0 == 1) or (P1 == 1):
+                store_label[i, j] = (P1 > rate*P0)*255
+            else:
+                distance = vec_im - pixel
+
+                clrlist = distance[:, 0:3].mul(distance[:, 0:3])
+                clrlist = torch.sum(clrlist, dim = 1)
+                clrlist = torch.sqrt(clrlist)
+                mean_clr_dis = torch.mean(clrlist)
+
+
+                spalist = distance[:, 3:5].mul(distance[:, 3:5])
+                spalist = torch.sum(spalist, dim = 1)
+                spalist = torch.sqrt(spalist)
+                mean_spa_dis = torch.mean(spalist)
+
+
+#                print(idx0.shape)
+#                print(vec_im.shape)
+                vec_neg = vec_im[idx0, :]
+                dis_neg = distance[idx0, :]
+                mean_dis_neg = torch.mean(dis_neg, dim = 0)
+
+                clr_dis_neg = torch.sqrt(torch.sum(mean_dis_neg[0:3].mul(mean_dis_neg[0:3])))
+                spa_dis_neg = torch.sqrt(torch.sum(mean_dis_neg[3:5].mul(mean_dis_neg[3:5])))
+
+
+
+                vec_pos = vec_im[idx1, :]
+                dis_pos = distance[idx1, :]
+                mean_dis_pos = torch.mean(dis_pos, dim = 0)
+
+                clr_dis_pos = torch.sqrt(torch.sum(mean_dis_pos[0:3].mul(mean_dis_pos[0:3])))
+                spa_dis_pos = torch.sqrt(torch.sum(mean_dis_pos[3:5].mul(mean_dis_pos[3:5])))
+
+
+                mean_neg = torch.mean(vec_neg, dim = 0)
+                mean_pos = torch.mean(vec_pos, dim = 0)
+
+                sigma_neg = torch.mean( (vec_neg - torch.mean(vec_neg, dim = 0)).mul(vec_neg - torch.mean(vec_neg, dim = 0)), dim = 0 )
+                sigma_pos = torch.mean( (vec_pos - torch.mean(vec_pos, dim = 0)).mul(vec_pos - torch.mean(vec_pos, dim = 0)), dim = 0 )
+
+                sigma_dis_neg = torch.sqrt(sigma_neg[3] + sigma_pos[4])
+                sigma_dis_pos = torch.sqrt(sigma_pos[3] + sigma_pos[4])
+
+
+#                print(sigma_dis_neg)
+#                print(sigma_dis_pos)
+
+
+                if isnan(sigma_dis_neg):
+                    sigma_dis_neg = 10000000
+
+                if isnan(sigma_dis_pos):
+                    sigma_dis_pos = 10000000
+
+
+                nor_clr_dis_neg = clr_dis_neg/mean_clr_dis
+                nor_spa_dis_neg = spa_dis_neg/mean_spa_dis
+
+                nor_clr_dis_pos = clr_dis_pos/mean_clr_dis
+                nor_spa_dis_pos = spa_dis_pos/mean_spa_dis
+
+                nor_spa_dis_pos = nor_spa_dis_pos * (sigma_dis_pos/sigma_dis_neg)
+
+
+                dis_neg = torch.sqrt(nor_clr_dis_neg*nor_clr_dis_neg + nor_spa_dis_neg*nor_spa_dis_neg)
+                dis_pos = torch.sqrt(nor_clr_dis_pos*nor_clr_dis_pos + nor_spa_dis_pos*nor_spa_dis_pos)
+
+
+                if isnan(dis_neg):
+                    dis_neg = 10000000
+
+                if isnan(dis_pos):
+                    dis_pos = 10000000
+
+
+
+                if (dis_neg == 0) or (dis_pos == 0) or (sigma_dis_pos == 0) or (sigma_dis_neg == 0):
+                    dis_neg = 1
+                    dis_pos = 1
+
+#                print("dis_neg:", dis_neg)
+#                print("dis_pos:", dis_pos)
+
+                P0_X = P0 * (1/dis_neg)
+                P1_X = P1 * (1/dis_pos)
+
+#                print("")
+
+#                print("borderline -----------------")
+#                print("P1_X:", P1_X)
+#                print("P0_X:", P0_X)
+#                print("borderline -----------------")
+                store_label[i,j] = (P1_X > rate*P0_X)*255
+
+    re_fg = store_label[radius:radius + row_im, radius:radius + column_im]
+
+    return re_fg
+
+
+
+def main():
+    print("test")
+
+    im_pa = 'D:/dataset/dataset2014/dataset/dynamicBackground/fountain01/input'
+    im_ft = 'jpg'
+
+    fg_pa = 'D:/projects/lab/fgimgs_fountain01_v34'
+    fg_ft = 'png'
+
+
+    fs_im, fullfs_im = loadFiles_plus(im_pa, im_ft)
+    fs_fg, fullfs_fg = loadFiles_plus(fg_pa, fg_ft)
+
+
+    idx = 1148
+
+    im = torch.tensor( imageio.imread(fullfs_im[idx]), dtype = torch.float )
+    fgim = torch.tensor( imageio.imread(fullfs_fg[idx]), dtype = torch.float )
+
+
+
+
+
+
+
+    # start here
+
+    radius = 3
+    rate = 0.6
+
+    bayfgim = bayesRefine(im, fgim, radius, rate)
+    bayfgim = bayesRefine(im, bayfgim, radius, rate)
+    bayfgim = bayesRefine(im, bayfgim, radius, rate)
+    bayfgim = bayesRefine(im, bayfgim, radius, rate)
+
+
+
+
+    print(bayfgim.shape)
+
+# bayesRefine(im, fgim, radius, rate):
+
+
+
+
+
+    plt.figure()
+    plt.subplot(1, 2, 1)
+    plt.imshow(fgim.detach().cpu().numpy())
+
+    plt.subplot(1, 2, 2)
+    plt.imshow(bayfgim.detach().cpu().numpy())
+
+    plt.show()
+
+
+
+
+
+#     imgs_pad = F.pad(imgs.permute(0, 3, 1, 2), (1, 1, 1, 1), mode='replicate')
+#     imgs_pad = imgs_pad.permute(0, 2, 3, 1)
+#     imgs_pad = (imgs_pad/255.0)*right
+#
+
+
+
+
+
+if __name__ == '__main__':
+    main()

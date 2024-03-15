@@ -1,0 +1,780 @@
+import torch
+
+from torch.autograd import Function
+
+import time
+
+import numpy as np
+
+import math
+
+
+
+def getc_X(min_x, max_x, delta):
+
+    bins = round((max_x - min_x)/delta + 1.0)
+
+    c_X = torch.linspace(min_x, max_x, bins)
+    c_X = torch.round(c_X/delta)*delta
+
+    return c_X
+
+def getNoiseVec(c_X, delta, chls, nums_pdf):
+    vec = torch.cat([torch.cat( [randPdf(c_X, delta).unsqueeze(0) for i in range(chls)],
+                                             dim = 0).unsqueeze(0) for n in range(nums_pdf)], dim = 0)
+
+    return vec
+
+
+def randPdf(c_X, delta):
+
+    f_X = c_X.clone()
+    f_X = torch.abs(f_X - f_X)
+    f_X.normal_(mean = 0, std = 1)
+
+    f_X = f_X.mul(1/f_X.sum())
+#    f_X = f_X.mul(1/delta)
+
+    f_X[:5] = 0
+    f_X[-5:] = 0
+
+    return f_X
+
+
+def randPdf_chls(c_X, delta, chls):
+
+    return torch.cat( [randPdf(c_X, delta).unsqueeze(0) for i in range(chls)], dim = 0)
+
+
+# generate Gaussian distribution
+def gaussianpdf(c_X, mu, sig):
+
+    return (1/(sig*math.sqrt(2*math.pi)))*torch.exp(-(c_X - mu).pow(2.0) / (2 * sig * sig ))
+
+
+def batchGauPdf(c_X, mus, sigs):
+
+    return [gaussianpdf(c_X, mus[i], sigs[i]) for i in range(len(mus))]
+
+
+# The cosine distance between two histogram
+def cosDisVal(f_X, f_Y):
+
+    return torch.sum(f_X.mul(f_Y))/(f_X.mul(f_X).sum().sqrt() * f_Y.mul(f_Y).sum().sqrt() )
+
+
+
+def batchGasVar(means, stds, num = 1000000):
+
+    return [torch.empty(num).normal_(mean = means[i], std = stds[i]) for i in range(len(means))]
+
+
+
+def data2pdf(X, delta = 0.01, min_x = None, max_x = None):
+
+    with torch.no_grad():
+
+        num = torch.numel(X)
+
+
+        if min_x == None:
+            min_x = torch.round(torch.min(X).mul(1.0 /delta)).mul(delta) - 5*delta
+        else:
+            min_x = torch.tensor(min_x, dtype=torch.float32) - 5*delta
+
+        if max_x == None:
+            max_x = torch.round(torch.max(X).mul(1.0 /delta)).mul(delta) + 5*delta
+        else:
+            max_x = torch.tensor(max_x, dtype=torch.float32) + 5*delta
+
+
+        bins = torch.round( ((max_x - min_x).mul(1/delta)).clone().detach() + 1).int()
+
+
+        f_X = torch.histc(X, bins, min_x, max_x)/num
+        f_X = f_X.mul(1.0/delta)
+
+        c_X = torch.linspace(min_x, max_x, bins)
+        c_X = torch.round(c_X/delta)*delta
+
+
+        return c_X, f_X
+
+
+
+def emptypdf(byte, min_x, max_x, delta):
+
+    with torch.no_grad():
+
+        min_x = torch.tensor(min_x, dtype=torch.float32)
+        max_x = torch.tensor(max_x, dtype=torch.float32) + 1*delta
+
+        bins = torch.round(((max_x - min_x).mul(1/delta)).clone().detach() + 1).int()
+
+        f_X = torch.randn(byte, bins)
+        f_X = f_X - f_X + 1.0
+
+
+        c_X = torch.linspace(min_x, max_x, bins)
+        c_X = torch.round(c_X/delta)*delta
+
+    return c_X, f_X
+
+
+# class ProbabilityDensityFunction
+class PDF:
+    def __init__(self, c_X, f_X):
+
+        self._c = c_X
+        self._f = f_X
+
+
+    _c = None
+    _f = None
+
+    _delta = None
+    _ctx = None
+
+
+class PDFs:
+    def __init__(self, c_list = None, f_list = None, delta = None):
+
+        if isinstance(c_list, tuple):
+            self._c = c_list[0]
+            self._f = torch.cat([t.unsqueeze(0) for t in f_list], dim = 0)
+
+            self._delta = delta
+
+        if isinstance(c_list, torch.Tensor):
+            self._c = c_list
+            self._f = f_list.unsqueeze(0)
+
+            self._delta = delta
+
+
+    def fromPDFs(self, c_X, f_X, delta):
+
+        self._c = c_X
+        self._f = f_X
+        self._delta = delta
+
+        return self
+
+
+    def gaussPDFs(self, num, byte, min_x, max_x, delta):
+        c_T, f_T = emptypdf(3, min_x, max_x, delta)
+
+        mu = (min_x + max_x)/2
+        sig = 10*delta
+        f_T = torch.cat([torch.cat([gaussianpdf(c_T, mu, sig).unsqueeze(0) for i in range(byte)] , dim = 0  ).unsqueeze(0) for j in range(num)  ], dim = 0 )
+        # 高斯函数自带delta的扩展
+        # f_T = f_T*(1.0/delta)
+
+        self._c = c_T
+        self._f = f_T
+        self._delta = delta
+
+
+        return self
+
+
+    def emptyPDFs(self, num, byte, min_x, max_x, delta):
+
+        c_T, f_T = emptypdf(3, min_x, max_x, delta)
+        f_T = torch.randn(num, byte, torch.numel(c_T))
+
+        self._c = c_T
+        self._f = torch.abs(f_T - f_T).normal_(0, 1.0)
+        #+ 1.0
+        #+ 1.0
+        #+ 1.0
+#        self._f.normal_(0, 1.0)
+        self._delta = delta
+
+
+        return self
+
+
+    def randPDFs(self, num, byte, min_x, max_x, delta):
+
+        c_T, f_T = emptypdf(3, min_x, max_x, delta)
+        f_T = torch.randn(num, byte, torch.numel(c_T))
+
+        self._c = c_T
+        self._f = torch.abs(f_T - f_T).normal_(0, 1.0)
+
+        sumval = self._f.sum(dim = 2)
+        sumval = 1/sumval
+        sumval = sumval.expand(self._f.shape[2], sumval.shape[0], sumval.shape[1])
+        sumval = sumval.permute(1, 2, 0)
+
+        self._f = self._f.mul(sumval)
+        self._f = self._f*(1/delta)
+
+#        self._f = sumval* self._f
+        #* sumval
+
+#        print(sumval)
+#         print(self._f.sum(dim = 2))
+#         print(sumval.shape)
+#         print(self._f.shape)
+#         input("stop herer")
+
+        #+ 1.0
+        #+ 1.0
+        #+ 1.0
+#        self._f.normal_(0, 1.0)
+        self._delta = delta
+
+
+
+        return self
+
+
+    def to(self, device):
+        self._c = self._c.to(device)
+        self._f = self._f.to(device)
+
+        return self
+
+
+
+    _c = None
+    _f = None
+
+    _delta = None
+    _ctx = None
+
+
+
+def preProcessPDF(X):
+
+    if X._ctx == None:
+        X._ctx = dict()
+        X._ctx['_1_c'] = 1.0/X._c
+        X._ctx['abs_1_c'] = torch.abs(X._ctx['_1_c'])
+
+        idx = torch.abs(X._c) < 0.1*X._delta
+        X._ctx['_idx0'] = idx
+
+        X._ctx['_1_c'][idx] = (1.0/X._delta)*1024
+        X._ctx['abs_1_c'][idx] = (1.0/X._delta)*1024
+        X._ctx['I_1_F'] = X._f.mul(X._ctx['abs_1_c'].expand(X._f.shape))
+
+    return X
+
+
+def manualAccuracy(data, delta = 0.01, exp=2):
+
+    return torch.round( data/(delta**exp) + 0.1)*(delta**exp)
+
+
+def preProdDis(X, W, Z):
+
+    X._f[:,:,-1] = 0
+    W._f[:,:,-1] = 0
+
+    Z._ctx['P_X_ZW'] = Z._c.squeeze().unsqueeze(1).mm(W._ctx['_1_c'].squeeze().unsqueeze(0))
+    Z._ctx['P_X_ZW'][Z._ctx['_idx0'], W._ctx['_idx0']] = 1.0
+    Z._ctx['P_POSX'] = quickPos(Z._ctx['P_X_ZW'], X._c, Z._delta)
+
+    Z._ctx['P_W_ZX'] = Z._c.squeeze().unsqueeze(1).mm(X._ctx['_1_c'].squeeze().unsqueeze(0))
+    Z._ctx['P_W_ZX'][Z._ctx['_idx0'], X._ctx['_idx0']] = 1.0
+    Z._ctx['P_POSW'] = quickPos(Z._ctx['P_W_ZX'], W._c, Z._delta)
+
+
+    return X, W, Z
+
+
+def preSumDis(X, W, Z):
+
+    X._f[:,:,-1] = 0
+    W._f[:,:,-1] = 0
+
+    Z._ctx['S_X_ZW'] = (Z._c - W._c.expand(torch.numel(Z._c), torch.numel(W._c)).t()).t()
+    Z._ctx['S_POSX'] = quickPos(Z._ctx['S_X_ZW'], X._c, Z._delta)
+
+    Z._ctx['S_W_ZX'] = (Z._c - X._c.expand(torch.numel(Z._c), torch.numel(X._c)).t()).t()
+    Z._ctx['S_POSW'] = quickPos(Z._ctx['S_W_ZX'], W._c, Z._delta)
+
+
+    return X, W, Z
+
+
+def arithmeticDis(X, W, Z, func, params = {'switch': True, 'normal:': True}):
+
+    Z._f = func(X._c, X._f, W._c, W._f, Z._c, X._ctx, W._ctx, Z._ctx, Z._delta, params)
+
+    return Z
+
+
+def quickPos(vals, c_X, delta):
+
+    vals = torch.round(vals/delta) - torch.round( torch.min(c_X)/delta )
+
+    LEN_X = torch.numel(c_X)
+
+    
+    vals[:, -1] = LEN_X
+    vals[-1, :] = LEN_X
+
+    vals[vals < 0] = LEN_X - 1
+    vals[vals >= LEN_X] = LEN_X - 1
+
+    return vals.long()
+
+
+class ProdDis(Function):
+
+    @staticmethod
+    def forward(ctx, c_X, f_X, c_W, f_W, c_Z, ctx_X, ctx_W, ctx_Z,
+                delta = 0.01,
+                params = {'switch': True, 'normal': True}):
+
+        with torch.no_grad():
+            f_X[:,:,-1] = 0
+            f_W[:,:,-1] = 0
+
+            # There is still a large space to speed this function. Matrix indexing takes around 60\% of running time.
+            # this idx step takes around 0.2 ms, which takes almost 30\% of total runtime
+            # 使用乘0，加和，会使得速度更快
+            ff_X = f_X[:, :, ctx_Z['P_POSX']]
+            I_1_W = f_W.mul(ctx_W['abs_1_c'].expand(f_W.shape))
+            f_Z_X = ff_X.matmul(I_1_W.permute(1,2,0))
+
+            # this idx step takes around 0.2 ms, which takes almost 30\% of total runtime
+            ff_W = f_W[:, :, ctx_Z['P_POSW']]
+            I_1_X = f_X.mul(ctx_X['abs_1_c'].expand(f_X.shape))
+            f_Z_W = ff_W.matmul(I_1_X.permute(1,2,0))
+
+        ctx.save_for_backward(ff_X, ff_W, ctx_X['abs_1_c'], ctx_W['abs_1_c'])
+
+        return f_Z_X
+
+    @staticmethod
+    def backward(ctx, f_grad_output):
+        # the number of parameters is related to the return of forward
+        # backward参数个数和forward的返回有关
+        # The gradient in the 0 entry is still unstable
+
+        with torch.no_grad():
+
+            ff_X, ff_W, c_1_X, c_1_W = ctx.saved_tensors
+
+            dW = ff_X.mul(c_1_W).permute(0, 1, 3, 2).matmul(f_grad_output)
+            dW = dW.sum(dim = 0).permute(2, 0, 1)
+
+            dX = ff_W.mul(c_1_X).permute(0, 1, 3, 2).matmul(f_grad_output.permute(3, 1, 2, 0))
+            dX = dX.sum(dim = 0).permute(2, 0, 1)
+
+        return None, dX, None, dW, None, None, None, None, None, None
+
+
+class SumDis(Function):
+
+    @staticmethod
+    def forward(ctx, c_X, f_X, c_W, f_W, c_Z, ctx_X, ctx_W, ctx_Z,
+                delta = 0.01,
+                params = {'switch': True, 'normal': True}):
+
+        with torch.no_grad():
+
+            f_X[:,:,-1] = 0
+            f_W[:,:,-1] = 0
+
+            # The same as proddis layer, but no need to handle the 0 entry histogram
+            ff_X = f_X[:, :, ctx_Z['S_POSX']]
+            f_Z_X = ff_X.matmul(f_W.permute(1, 2, 0))
+
+            ff_W = f_W[:, :, ctx_Z['S_POSW']]*delta
+
+        ctx.save_for_backward(ff_X, ff_W)
+
+        return f_Z_X
+
+    @staticmethod
+    def backward(ctx, f_grad_output):
+
+        with torch.no_grad():
+            ff_X, ff_W = ctx.saved_tensors
+
+            dW = ff_X.permute(0, 1, 3, 2).matmul(f_grad_output)
+            dW = dW.sum(dim = 0).permute(2, 0, 1)
+
+            dX = ff_W.permute(0, 1, 3, 2).matmul(f_grad_output.permute(3, 1, 2, 0))
+            dX = dX.sum(dim = 0).permute(2, 0, 1)
+
+        return None, dX, None, dW, None, None, None, None, None, None
+
+
+
+class ProdDis_plus(Function):
+
+    @staticmethod
+    def forward(ctx, c_X, f_X, c_W, f_W, c_Z, ctx_X, ctx_W, ctx_Z,
+                delta = 0.01,
+                params = {'switch': True, 'normal': True}):
+
+        with torch.no_grad():
+
+            # There is still a large space to speed this function. Matrix indexing takes around 60\% of running time.
+            # this idx step takes around 0.2 ms, which takes almost 30\% of total runtime
+            ff_X = f_X[:, :, ctx_Z['P_POSX']]
+            I_1_W = f_W.mul(ctx_W['abs_1_c'].expand(f_W.shape))
+            f_Z_X = ff_X.matmul(I_1_W.permute(1,2,0))
+#
+            # this idx step takes around 0.2 ms, which takes almost 30\% of total runtime
+            ff_W = f_W[:, :, ctx_Z['P_POSW']]
+            I_1_X = f_X.mul(ctx_X['abs_1_c'].expand(f_X.shape))
+            f_Z_W = ff_W.matmul(I_1_X.permute(1,2,0))
+
+
+
+            # to save computation resource, remove *delta
+            E_X = f_X.matmul(c_X)#*delta
+            E_W = f_W.matmul(c_W)#*delta
+
+            EE_X = E_X.expand(E_W.shape[0], E_X.shape[0], E_X.shape[1])
+            EE_W = E_W.expand(E_X.shape[0], E_W.shape[0], E_W.shape[1])
+
+            # it is faster by replacing the idx with multiplication and plus
+            # 通过乘0 加和，速度更快
+            idx = EE_X.permute(1, 0, 2) > EE_W
+
+            T_X = f_Z_X.permute(2, 0, 3, 1).mul(~idx)
+            T_W = f_Z_W.permute(2, 3, 0, 1).mul(idx)
+            f_Z = T_X + T_W
+
+            # this line of code takes too much time
+#            f_Z_X[idx] = f_Z_W[idx]
+
+        ctx.save_for_backward(ff_X, ff_W, ctx_X['abs_1_c'], ctx_W['abs_1_c'])
+
+        return f_Z.permute(1, 3, 0, 2)
+
+    @staticmethod
+    def backward(ctx, f_grad_output):
+        # the number of parameters is related to the return of forward
+        # backward参数个数和forward的返回有关
+        # The gradient in the 0 entry is still unstable
+
+        with torch.no_grad():
+
+            ff_X, ff_W, c_1_X, c_1_W = ctx.saved_tensors
+
+            dW = ff_X.mul(c_1_W).permute(0, 1, 3, 2).matmul(f_grad_output)
+            dW = dW.sum(dim = 0).permute(2, 0, 1)
+
+            dX = ff_W.mul(c_1_X).permute(0, 1, 3, 2).matmul(f_grad_output.permute(3, 1, 2, 0))
+            dX = dX.sum(dim = 0).permute(2, 0, 1)
+
+        return None, dX, None, dW, None, None, None, None, None, None
+
+
+def batchEmptyNormal(mus, sigmas, num = 1000):
+
+    T = [torch.empty(num).normal_(mean = mus[i], std = sigmas[i]) for i in range(len(mus))]
+
+    return T
+
+
+
+##################################################################################################################
+##################################################################################################################
+#  旧版本的distribution layer
+
+
+class ProductDis_multi(Function):
+
+
+    @staticmethod
+    def forward(ctx, c_X, f_X, c_W, f_W, c_Z,
+                border = 0.1,
+                params = {'zero_swap': True, 'zero_approx': True, 'normal': True}):
+
+        with torch.no_grad():
+
+
+            N_X, L_X = f_X.shape
+            N_W, L_W = f_W.shape
+
+
+            NUM_X, LEN_X = f_X.shape
+            NUM_W, LEN_W = f_W.shape
+
+            LEN_Z = torch.numel(c_Z)
+
+
+
+            cc_W = c_W.expand(LEN_Z, LEN_W).t()
+            X = c_Z / cc_W
+
+
+#            cc_W = c_W.expand(LEN_Z, LEN_W).t()
+            mc_W = torch.abs(1/cc_W)
+            mc_W[mc_W == float('inf')] = 0
+
+
+            pos = torch.round( X/border ) - torch.round( torch.min(c_X/border) )
+
+
+            pos[ ~( (pos > -1) & (pos < torch.numel(c_X) ) ) ] = LEN_X
+            pos = pos.long()
+
+
+            ff_X = torch.cat((f_X, f_X[:, -2:-1]), dim=1)
+            ff_X[:, LEN_X] = 0.0
+
+            mf_X = ff_X[:, pos]
+
+
+            mf_X = mf_X.expand(NUM_W, NUM_X, LEN_W, LEN_Z).permute(1, 0, 2, 3)
+
+
+            mf_W = f_W.clone()
+            mf_W[:, c_W == 0] = 0
+            mf_W = mf_W.expand(LEN_Z, NUM_W, LEN_W).permute(1, 2, 0)
+
+
+
+
+            f_Z = mf_X[:].mul(mf_W[:].mul(mc_W))
+
+
+            f_Z = torch.sum(f_Z, dim = 2)
+
+        ctx.save_for_backward( mf_X, mc_W)
+
+
+#        ctx.save_for_backward(c_Z, c_W, c_X, f_X, torch.tensor([border]))
+
+        return c_Z, f_Z
+
+    @staticmethod
+    def backward(ctx, c_grad_output, f_grad_output):
+
+#        print("start backword")
+
+        with torch.no_grad():
+
+
+            # 0 的情况没有像forward那样好好处理
+
+            smf_X, smc_W = ctx.saved_tensors
+#            print("bacdword borderline -------------------------")
+
+#            print("c_grad_output:", c_grad_output.shape)
+#            print("f_grad_output:", f_grad_output.shape)
+
+            df_Z = f_grad_output.clone()
+
+            dt_W = smf_X[:, :].mul(smc_W)
+            dt_W = dt_W.permute(2, 0, 1, 3)
+
+            df_W = dt_W[:].mul(df_Z)
+
+            df_W = df_W.permute(1, 2, 0, 3)
+
+            df_W = torch.sum(df_W, dim = 3)
+
+
+
+
+
+
+#            print("df_W.shape:", df_W.shape)
+
+#
+#             print("dt_W.shape:", dt_W.shape)
+#
+#
+#             print("smf_X.shape:", smf_X.shape)
+#             print("smc_W.shape:", smc_W.shape)
+#
+#            print("bacdword borderline -------------------------")
+
+
+#            c_Z, c_W, c_X, f_X, border = ctx.saved_tensors
+
+#        print("finish backward")
+
+
+
+        return None, None, None, df_W, None, None, None, None
+
+
+class DifferentiateDis_multi(Function):
+
+    @staticmethod
+    def forward(ctx, c_X, f_X, c_W, f_W, c_Z,
+                border = 0.1,
+                params = {'zero_swap': True, 'zero_approx': True, 'normal': True}):
+
+        with torch.no_grad():
+
+            N_X, L_X = f_X.shape
+            N_W, L_W = f_W.shape
+
+
+            NUM_X, LEN_X = f_X.shape
+            NUM_W, LEN_W = f_W.shape
+
+            LEN_Z = torch.numel(c_Z)
+
+
+            cc_W = c_W.expand(LEN_Z, LEN_W).t()
+            X = c_Z - cc_W
+
+
+            pos = torch.round( X/border ) - torch.round( torch.min(c_X/border) )
+
+
+            pos[ ~( (pos > -1) & (pos < torch.numel(c_X) ) ) ] = LEN_X
+            pos = pos.long()
+
+
+            ff_X = torch.cat((f_X, f_X[:, -2:-1]), dim=1)
+            ff_X[:, LEN_X] = 0.0
+
+            mf_X = ff_X[:, pos]
+
+
+            mf_X = mf_X.expand(NUM_W, NUM_X, LEN_W, LEN_Z).permute(1, 0, 2, 3)
+
+
+            mf_W = f_W.clone()
+            mf_W[:, c_W == 0] = 0
+            mf_W = mf_W.expand(LEN_Z, NUM_W, LEN_W).permute(1, 2, 0)
+
+
+#             cc_W = c_W.clone()
+#             cc_W = cc_W.expand(LEN_Z, LEN_W).t()
+#             mc_W = torch.abs(1/cc_W)
+#             mc_W[mc_W == float('inf')] = 0
+
+
+ #           print("mc_W:", mc_W.shape)
+#             print("mf_W:", mf_W.shape)
+#             print("mf_X:", mf_X.shape)
+
+            f_Z = mf_X[:].mul(mf_W)
+
+
+#            f_Z = mf_X[:].mul(mf_W[:].mul(mc_W))
+
+
+
+            f_Z = torch.sum(f_Z, dim = 2)
+
+#        ctx.save_for_backward( mf_X, mc_W)
+        ctx.save_for_backward(mf_X)
+
+        return c_Z, f_Z
+
+
+    @staticmethod
+    def backward(ctx, c_grad_output, f_grad_output):
+
+        with torch.no_grad():
+
+#             mf_X, = ctx.saved_tensors
+#
+#             df_Z = f_grad_output.clone()
+
+
+#             print("backward")
+#             print("mf_X.shape:", mf_X.shape)
+#
+#             print("df_Z.shape:", df_Z.shape)
+
+
+            smf_X, = ctx.saved_tensors
+#            print("bacdword borderline -------------------------")
+
+#            print("c_grad_output:", c_grad_output.shape)
+#            print("f_grad_output:", f_grad_output.shape)
+
+            df_Z = f_grad_output.clone()
+
+            dt_W = smf_X
+            #[:, :].mul(smc_W)
+            dt_W = dt_W.permute(2, 0, 1, 3)
+
+            df_W = dt_W[:].mul(df_Z)
+
+            df_W = df_W.permute(1, 2, 0, 3)
+
+            df_W = torch.sum(df_W, dim = 3)
+
+
+
+
+        return None, None, None, df_W, None, None, None
+
+
+
+
+def getEmptyCF_plus(left, right, delta, num):
+
+    bins = round((right - left)/delta) + 1
+
+    c_X = torch.linspace(left, right, bins)
+    #c_X = torch.round(c_X/delta)*delta
+
+    f_X = c_X.clone() - c_X
+    f_X = f_X.unsqueeze(0)
+
+    for i in range(num - 1):
+        f_T = c_X.clone() - c_X
+        f_T = f_T.unsqueeze(0)
+
+        f_X = torch.cat((f_X, f_T), dim = 0)
+
+    return c_X, f_X
+
+
+def getRandCF_multi(left, right, delta, num, byte):
+
+    c_X, f_X = getRandCF_plus(left, right, delta, num)
+    f_X = f_X.unsqueeze(-1)
+
+    for i in range(1, byte):
+        c_T, f_T = getRandCF_plus(left, right, delta, num)
+        f_T = f_T.unsqueeze(-1)
+
+        f_X = torch.cat((f_X, f_T), dim = -1)
+
+    return c_X, f_X
+
+def getRandCF_plus(left, right, delta, num):
+
+    bins = round((right - left)/delta) + 1
+
+    c_X = torch.linspace(left, right, bins)
+    #c_X = torch.round(c_X/delta)*delta
+
+    f_X = torch.abs(torch.randn(bins))
+    f_X = f_X/torch.sum(f_X)
+    f_X = f_X.unsqueeze(0)
+
+    for i in range(num - 1):
+        f_T = torch.abs(torch.randn(bins))
+        f_T = f_T/torch.torch.sum(f_T)
+        f_T = f_T.unsqueeze(0)
+
+        f_X = torch.cat((f_X, f_T), dim = 0)
+
+
+    return c_X, f_X
+
+
+def getEmptyCF(left, right, delta):
+
+    bins = round((right - left)/delta) + 1
+
+    c_X = torch.linspace(left, right, bins)
+
+    f_X = c_X.clone() - c_X
+
+
+    return c_X, f_X
