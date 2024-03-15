@@ -1,4 +1,5 @@
 # LTS: Learning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation
+[![Watch the video](https://img.youtube.com/vi/BcLnNTne-n0/maxresdefault.jpg)](https://www.youtube.com/watch?v=BcLnNTne-n0)
 
 ## News 🎺🎺🎺
 ``March 15, 2024``
