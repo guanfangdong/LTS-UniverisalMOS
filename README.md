@@ -39,6 +39,11 @@ We have utilized common libraries such as NumPy or Torch to ensure the code runs
 - `/data`: Contains the sample testing data.
   - `/highway`: A sample video from CDNet2014 dataset.
 - `/deps`: Contains the custom dependencies.
+- `/output`: To save LTS results.
+  - `/highway`: A sample video results from CDNet2014 dataset.
+    - `/DIDL`: Results from DIDL module.
+    - `/SBR`: Results of SBR heatmap.
+    - `/SBR`: Results of SBR Network, also the final LTS results.
 
 ## Progress Tracking
 
@@ -54,7 +59,7 @@ The table below summarizes the current progress and upcoming developments of the
 | UI Interface Development  | ❌     |
 
 ## Usage
-Currently, the model can be used for inference on the provided dataset or your own data. Detailed code and usage instructions will be released soon.
+Please run the .ipynb file provided by us for testing.
 
 ## Citation
 If you find our dataset and model useful in your research, please consider citing:
