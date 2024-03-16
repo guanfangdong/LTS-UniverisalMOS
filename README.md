@@ -50,7 +50,7 @@ We have utilized common libraries such as NumPy or Torch to ensure the code runs
 - `/output`: To save LTS results.
   - `/highway`: A sample video results from CDNet2014 dataset.
     - `/DIDL`: Results from DIDL module.
-    - `/SBR`: Results of SBR heatmap.
+    - `/mask`: Results of SBR heatmap.
     - `/SBR`: Results of SBR Network, also the final LTS results.
 
 ## Progress Tracking
