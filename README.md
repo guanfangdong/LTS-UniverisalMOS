@@ -26,6 +26,9 @@ The dataset is split into multiple parts and is accessible via Google Drive. Her
 - [Google Drive Link](https://drive.google.com/drive/folders/1M3YsXmIBhsonYSMySTgI016kSXKwoV1j?usp=drive_link)
 - [Our Server Link](http://129.128.243.176/LTS-Dataset/)
 
+### Dataset Structure
+
+The dataset is organized in compressed files for convenient download, with the following sizes:
 - `part1.tar.gz` - 13G
 - `part2.tar.gz` - 12G
 - `part3.zip` - 24G
