@@ -22,7 +22,7 @@ This repository hosts the dataset and model files for the LTS (Learning Temporal
 We proposed the LTS dataset, covering a wide range of natural scenes. These videos are instrumental in demonstrating the effectiveness and universality of our approach for moving object segmentation.
 
 ### Dataset Access
-The dataset is split into multiple parts and is accessible via Google Drive. Here are the links to download the dataset:
+The dataset is split into multiple parts and is accessible via Google Drive and our Server. Here are the links to download the dataset:
 - [Google Drive Link](https://drive.google.com/drive/folders/1M3YsXmIBhsonYSMySTgI016kSXKwoV1j?usp=drive_link)
 - [Our Server Link](http://129.128.243.176/LTS-Dataset/)
 
