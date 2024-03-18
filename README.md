@@ -24,16 +24,16 @@ We proposed the LTS dataset, covering a wide range of natural scenes. These vide
 ### Dataset Access
 The dataset is split into multiple parts and is accessible via Google Drive. Here are the links to download the dataset:
 - [Google Drive Link](https://drive.google.com/drive/folders/1M3YsXmIBhsonYSMySTgI016kSXKwoV1j?usp=drive_link)
+- [Our Server Link](http://129.128.243.176/LTS-Dataset/)
 
-### Dataset Structure
-The dataset is organized in compressed files for convenient download:
-- `part1.tar.gz`
-- `part2.tar.gz`
-- `part3.zip`
-- `part4.tar.gz`
-- `part5.zip`
-- `part6.zip`
-- `raw_videos` directory containing all the raw video files.
+- `part1.tar.gz` - 13G
+- `part2.tar.gz` - 12G
+- `part3.zip` - 24G
+- `part4.tar.gz` - 12G
+- `part5.zip` - 7.4G
+- `part6.zip` - 2.4G
+
+Additionally, there is a `raw_videos` directory containing all the raw video files.
 
 After downloading, extract the files to access the video data.
 
