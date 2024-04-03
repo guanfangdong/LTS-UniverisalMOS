@@ -75,12 +75,16 @@ Please run the .ipynb file provided by us for testing.
 ## Citation
 If you find our dataset and model useful in your research, please consider citing:
 ```
-@article{dong2023learning,
-  title={Learning Temporal Distribution and Spatial Correlation for Universal Moving Object Segmentation},
+@ARTICLE{10478283,
   author={Dong, Guanfang and Zhao, Chenqiu and Pan, Xichen and Basu, Anup},
-  journal={arXiv preprint arXiv:2304.09949},
-  year={2023}
-}
+  journal={IEEE Transactions on Image Processing}, 
+  title={Learning Temporal Distribution and Spatial Correlation Toward Universal Moving Object Segmentation}, 
+  year={2024},
+  volume={33},
+  number={},
+  pages={2447-2461},
+  keywords={Videos;Training;Object segmentation;Correlation;Iterative methods;Mathematical models;Deep learning;Moving object segmentation;distribution learning;Bayesian probabilistic model;machine learning},
+  doi={10.1109/TIP.2024.3378473}}
 ```
 
 ## Related Work
