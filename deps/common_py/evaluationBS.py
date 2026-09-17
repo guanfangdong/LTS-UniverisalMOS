@@ -1,174 +1,91 @@
-import numpy as np
+"""Binary-segmentation metrics used by the LTS demo and experiments.
 
+Ground-truth and prediction masks use the CDNet convention: foreground is
+``255`` and background is ``0``.  Pixels with other values are ignored, just
+as they were in the original implementation.
+"""
+
+import numpy as np
 import torch
 
 
-
 def evaluation_numpy_entry_torch(prelabs, trulabs):
+    """Return ``(TP, FP, TN, FN)`` as NumPy scalar arrays for tensors."""
 
-    TP = torch.sum((prelabs == 255) & (trulabs == 255))
-    FP = torch.sum((prelabs == 255) & (trulabs == 0))
-    TN = torch.sum((prelabs == 0) & (trulabs == 0))
-    FN = torch.sum((prelabs == 0) & (trulabs == 255))
+    tp = torch.sum((prelabs == 255) & (trulabs == 255))
+    fp = torch.sum((prelabs == 255) & (trulabs == 0))
+    tn = torch.sum((prelabs == 0) & (trulabs == 0))
+    fn = torch.sum((prelabs == 0) & (trulabs == 255))
 
-    return TP.numpy(), FP.numpy(), TN.numpy(), FN.numpy()
+    # ``detach().cpu()`` preserves the returned NumPy scalar shape while also
+    # allowing callers to evaluate tensors produced on a CUDA device.
+    return (
+        tp.detach().cpu().numpy(),
+        fp.detach().cpu().numpy(),
+        tn.detach().cpu().numpy(),
+        fn.detach().cpu().numpy(),
+    )
 
+
+def _confusion_counts(prelabs, trulabs):
+    """Count the four binary-mask outcomes without changing label semantics."""
+
+    # Flatten to scalars before conversion.  The previous (n, 1) indexing
+    # raised under NumPy 2.x because ``int(np.array([value]))`` is no longer
+    # accepted; the classification rules themselves remain unchanged.
+    predictions = np.reshape(prelabs, -1)
+    truth = np.reshape(trulabs, -1)
+
+    tp = tn = fp = fn = 0
+
+    # Use the prediction length as the loop bound, matching the old function
+    # for mismatched input lengths (an undersized truth array still raises).
+    for i in range(np.size(predictions)):
+        prolab = int(predictions[i])
+        trulab = int(truth[i])
+
+        if prolab == 255 and trulab == 255:
+            tp += 1
+
+        if prolab == 255 and trulab == 0:
+            fp += 1
+
+        if prolab == 0 and trulab == 0:
+            tn += 1
+
+        if prolab == 0 and trulab == 255:
+            fn += 1
+
+    return tp, fp, tn, fn
 
 
 def evaluation_numpy_entry(prelabs, trulabs):
-    prelabs = np.reshape(prelabs, (np.size(prelabs), 1))
-    trulabs = np.reshape(trulabs, (np.size(trulabs), 1))
+    """Return integer ``(TP, FP, TN, FN)`` counts for NumPy-like masks."""
 
-#     TP = np.sum( (prelabs == 1) & (trulabs == 1) )
-#     FP = np.sum( (prelabs == 1) & (trulabs == 0) )
-#     TN = np.sum( (prelabs == 0) & (trulabs == 0) )
-#     FN = np.sum( (prelabs == 0) & (trulabs == 0) )
-#
-    TP = 0
-    TN = 0
-    FP = 0
-    FN = 0
-
-    count = np.size(prelabs)
-
-    for i in range(count):
-        prolab = int(prelabs[i])
-        trulab = int(trulabs[i])
-
-#        print("prolab:", prolab, "trulab:", trulab)
-
-        if prolab == 255 and trulab == 255:
-            TP += 1
-#            print("TP")
-
-        if prolab == 255 and trulab == 0:
-            FP += 1
-#            print("FP")
-
-        if prolab == 0 and trulab == 0:
-            TN += 1
-#            print("TN")
-
-        if prolab == 0 and trulab == 255:
-            FN += 1
-#            print("FN")
+    return _confusion_counts(prelabs, trulabs)
 
 
+def _metrics(tp, fp, fn):
+    """Compute recall, precision and F-measure using the original safeguards."""
 
+    recall = tp / max((tp + fn), 1)
+    precision = tp / max((tp + fp), 1)
+    f_measure = (2 * precision * recall) / max((precision + recall), 0.0001)
 
-
-#     Re = TP/max((TP + FN), 1)
-#     Pr = TP/max((TP + FP), 1)
-#
-#     Fm = (2*Pr*Re)/max((Pr + Re), 1)
-
-
-    return TP, FP, TN, FN
-
-
-
-
+    return recall, precision, f_measure
 
 
 def evaluation_numpy(prelabs, trulabs):
-    prelabs = np.reshape(prelabs, (np.size(prelabs), 1))
-    trulabs = np.reshape(trulabs, (np.size(trulabs), 1))
+    """Return ``(recall, precision, F-measure)`` for binary masks."""
 
-#     TP = np.sum( (prelabs == 1) & (trulabs == 1) )
-#     FP = np.sum( (prelabs == 1) & (trulabs == 0) )
-#     TN = np.sum( (prelabs == 0) & (trulabs == 0) )
-#     FN = np.sum( (prelabs == 0) & (trulabs == 0) )
-#
-    TP = 0
-    TN = 0
-    FP = 0
-    FN = 0
-
-    count = np.size(prelabs)
-
-    for i in range(count):
-        prolab = int(prelabs[i])
-        trulab = int(trulabs[i])
-
-#        print("prolab:", prolab, "trulab:", trulab)
-
-        if prolab == 255 and trulab == 255:
-            TP += 1
-#            print("TP")
-
-        if prolab == 255 and trulab == 0:
-            FP += 1
-#            print("FP")
-
-        if prolab == 0 and trulab == 0:
-            TN += 1
-#            print("TN")
-
-        if prolab == 0 and trulab == 255:
-            FN += 1
-#            print("FN")
-
-
-
-
-
-    Re = TP/max((TP + FN), 1)
-    Pr = TP/max((TP + FP), 1)
-
-    Fm = (2*Pr*Re)/max((Pr + Re), 0.0001)
-
-
-    return Re, Pr, Fm
-
-
-
-
+    tp, fp, _tn, fn = _confusion_counts(prelabs, trulabs)
+    return _metrics(tp, fp, fn)
 
 
 def evaluation_BS(prelabs, trulabs):
-    prelabs = np.reshape(prelabs, (np.size(prelabs), 1))
-    trulabs = np.reshape(trulabs, (np.size(trulabs), 1))
+    """Return metrics followed by the underlying ``TP, FP, TN, FN`` counts."""
 
-#     TP = np.sum( (prelabs == 1) & (trulabs == 1) )
-#     FP = np.sum( (prelabs == 1) & (trulabs == 0) )
-#     TN = np.sum( (prelabs == 0) & (trulabs == 0) )
-#     FN = np.sum( (prelabs == 0) & (trulabs == 0) )
-#
+    tp, fp, tn, fn = _confusion_counts(prelabs, trulabs)
+    recall, precision, f_measure = _metrics(tp, fp, fn)
 
-    TP = 0
-    TN = 0
-    FP = 0
-    FN = 0
-
-    count = np.size(prelabs)
-
-    for i in range(count):
-        prolab = int(prelabs[i])
-        trulab = int(trulabs[i])
-
-#        print("prolab:", prolab, "trulab:", trulab)
-
-        if prolab == 255 and trulab == 255:
-            TP += 1
-#            print("TP")
-
-        if prolab == 255 and trulab == 0:
-            FP += 1
-#            print("FP")
-
-        if prolab == 0 and trulab == 0:
-            TN += 1
-#            print("TN")
-
-        if prolab == 0 and trulab == 255:
-            FN += 1
-#            print("FN")
-
-
-    Re = TP/max((TP + FN), 1)
-    Pr = TP/max((TP + FP), 1)
-
-    Fm = (2*Pr*Re)/max((Pr + Re), 0.0001)
-
-
-    return Re, Pr, Fm, TP, FP, TN, FN
+    return recall, precision, f_measure, tp, fp, tn, fn

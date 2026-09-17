@@ -1,0 +1,8 @@
+# Install a PyTorch/torchvision pair that matches your CPU or CUDA runtime first.
+# See https://pytorch.org/get-started/locally/ for the appropriate command.
+numpy>=1.24
+imageio>=2.31
+matplotlib>=3.7
+scikit-image>=0.21
+jupyter>=1.0
+ipykernel>=6.0

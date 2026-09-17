@@ -1,26 +1,13 @@
+"""Compatibility entry point for deps.params_input.exp1."""
+
 import sys
+from pathlib import Path
 
-import numpy as np
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from deps.params_input.exp1 import *  # noqa: F401,F403
+from deps.params_input.exp1 import main as _main
 
-class QParams:
-    def setParams():
-        return 0;
-
-
-    m_params = []
-
-
-def main(argc, argv):
-
-    print("argc = ", argc)
-
-    for i in range(argc):
-        print(argv[i])
-
-
-if __name__ == '__main__':
-    argc = len(sys.argv)
-    argv = sys.argv
-
-    main(argc, argv)
+if __name__ == "__main__":
+    _main(len(sys.argv), sys.argv)

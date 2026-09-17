@@ -1,0 +1,18 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.env
+
+# Notebook and test-tool state
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# Platform/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp

@@ -1,98 +1,131 @@
-# LTS: Learning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation
-[![LTS Dataset](https://img.shields.io/badge/Click%20to%20watch-LTS%20results%20on%20new%20LTS%20dataset!-brightgreen)](https://www.youtube.com/watch?v=BcLnNTne-n0)
+# LTS: Learning Temporal Distribution and Spatial Correlation
 
-[![Standard Dataset](https://img.shields.io/badge/Click%20to%20watch-LTS%20results%20on%20standard%20dataset!-brightgreen)](https://www.youtube.com/watch?v=0UI-cezMFlI)
-<div align="center">
-    <a href="https://www.youtube.com/watch?v=BcLnNTne-n0">
-        <img src="https://i.imgur.com/LW93XnL.png" width="700" alt="video">
-    </a>
-</div>
+This repository contains the released models, sample data, demo notebook and
+supporting code for **Learning Temporal Distribution and Spatial Correlation
+Toward Universal Moving Object Segmentation**. The method targets moving
+object segmentation in videos recorded by stationary cameras.
 
-## News 🎺🎺🎺
-``March 15, 2024``
-We have uploaded an .ipynb file for testing purposes, using the video "highway" from CDNet2014. As our algorithm is universial, we are preparing to upload another .ipynb file to test any video you have on hand.
+- Paper: [IEEE Transactions on Image Processing](https://ieeexplore.ieee.org/document/10478283)
+- Preprint: [arXiv:2304.09949](https://arxiv.org/abs/2304.09949)
+- Results on the [LTS dataset](https://www.youtube.com/watch?v=BcLnNTne-n0)
+- Results on the [standard dataset](https://www.youtube.com/watch?v=0UI-cezMFlI)
 
-``March 06, 2024``
-We are pleased to announce that our paper has been accepted by **IEEE Transactions on Image Processing** (Please check https://ieeexplore.ieee.org/document/10478283). We are currently working with the editors on proofreading for the final public release. The arXiv version of the paper has also been updated (Please check https://arxiv.org/abs/2304.09949). We will also be updating this GitHub repository accordingly.
+## Quick start
 
-## Introduction
-This repository hosts the dataset and model files for the LTS (Learning Temporal Distribution and Spatial Correlation Towards Universal Moving Object Segmentation) approach, a novel method for moving object segmentation in videos using stationary cameras. Our method focuses on learning from diverse videos by capturing the similarities in temporal pixel distributions and refining segmentation through spatial correlation learning.
+The checked-in `data/highway` sample and model weights are enough to run the
+demo. Run Jupyter from the repository root because the notebook uses paths such
+as `./models` and `./data`.
 
-## Dataset
-We proposed the LTS dataset, covering a wide range of natural scenes. These videos are instrumental in demonstrating the effectiveness and universality of our approach for moving object segmentation.
+```bash
+git clone git@github.com:guanfangdong/LTS-UniverisalMOS.git
+cd LTS-UniverisalMOS
 
-### Dataset Access
-The dataset is split into multiple parts and is accessible via Google Drive and our Server. Here are the links to download the dataset:
-- [Google Drive Link](https://drive.google.com/drive/folders/1M3YsXmIBhsonYSMySTgI016kSXKwoV1j?usp=drive_link)
-- [Our Server Link](http://129.128.243.176/LTS-Dataset/)
+# Install a PyTorch/torchvision pair appropriate for your CPU or CUDA version.
+# See https://pytorch.org/get-started/locally/ for the matching command.
+python -m pip install -r requirements.txt
+python -m pip install torch torchvision
 
-### Dataset Structure
+jupyter lab test_demo.ipynb
+```
 
-The dataset is organized in compressed files for convenient download, with the following sizes:
-- `part1.tar.gz` - 13G
-- `part2.tar.gz` - 12G
-- `part3.zip` - 24G
-- `part4.tar.gz` - 12G
-- `part5.zip` - 7.4G
-- `part6.zip` - 2.4G
+Open `test_demo.ipynb` and run all cells. It runs the two released stages in
+order:
 
-Additionally, there is a `raw_videos` directory containing all the raw video files.
+1. **DIDL** estimates temporal distributions and writes intermediate masks to
+   `output/highway/DIDL/`.
+2. **SBR** refines those masks using spatial correlation and writes the final
+   results to `output/highway/SBR/`. The generated heatmaps are written to
+   `output/highway/mask/`.
 
-After downloading, extract the files to access the video data.
+The demo can use CUDA when it is available. The model-loading and tensor code
+are unchanged from the released workflow, so a compatible PyTorch installation
+and enough GPU/CPU memory are required for a full run.
 
-## Model
-We currently provide the trained LTS model file. The model is located in the "models" folder. As our algorithm is universal, we do not require any retraining or fine-tuning to adapt to your model.
+## Repository layout
 
-We have utilized common libraries such as NumPy or Torch to ensure the code runs smoothly. If you encounter any issues with the code, please feel free to submit an issue in this GitHub repository or contact us directly.
+```text
+.
+├── data/highway/                 # Included CDNet2014 sample input and labels
+├── models/                       # Released DIDL and SBR weights
+├── output/highway/               # Included sample outputs; demo writes here
+├── test_demo.ipynb               # End-to-end DIDL + SBR demonstration
+├── deps/
+│   ├── ADNNet_data_plus.py       # Data preparation and DIDL helpers
+│   ├── common_py/                # I/O, metrics and image-processing helpers
+│   ├── bayesian/                 # Bayesian refinement implementation
+│   ├── binarymask/               # Training-mask conversion
+│   ├── params_input/             # Legacy experiment parameter parser
+│   └── function/                 # Distribution operators and old experiments
+├── requirements.txt
+└── tests/test_regression.py      # Lightweight interface/regression checks
+```
 
-### Model File Structure
-- `/models`: Contains the LTS model files.
-- `/data`: Contains the sample testing data.
-  - `/highway`: A sample video from CDNet2014 dataset.
-- `/deps`: Contains the custom dependencies.
-- `/output`: To save LTS results.
-  - `/highway`: A sample video results from CDNet2014 dataset.
-    - `/DIDL`: Results from DIDL module.
-    - `/mask`: Results of SBR heatmap.
-    - `/SBR`: Results of SBR Network, also the final LTS results.
+The five model files currently included are:
 
-## Progress Tracking
+```text
+models/f_B_0069.pt
+models/f_W_0069.pt
+models/netC_0069.pt
+models/netP_0069.pt
+models/network_dis_0100.pt
+```
 
-The table below summarizes the current progress and upcoming developments of the project. A check mark (✔️) indicates completed items, while a cross mark (❌) signifies items that are still in progress.
+## Code organisation
 
-| Feature/Milestone         | Status |
-|---------------------------|--------|
-| Dataset Release           | ✔️     |
-| Model Weights Release     | ✔️     |
-| New ADNN Architecture     | ✔️     |
-| Testing Procedure Release | ✔️     |
-| Training Procedure Release| ❌     |
-| UI Interface Development  | ❌     |
+The Python code is now importable as the `deps` package. Shared utilities have
+kept their original public function names so the notebook and existing
+experiments remain compatible. The identical files that previously existed in
+both `deps/` and `deps/function/` are now small compatibility entry points; the
+historical variants that have different behaviour remain separate.
 
-## Usage
-Please run the .ipynb file provided by us for testing.
+The refactor is intentionally behaviour-preserving for the released pipeline:
+the model files, tensor operations, data ordering, output directories and
+experiment-specific implementations are retained. The binary-mask metrics
+also now work with current NumPy versions, where the old two-dimensional scalar
+conversion raised an exception.
+
+Run the lightweight checks with:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+The full notebook is the authoritative end-to-end validation because it
+requires the optional image, plotting and Jupyter dependencies and processes
+the complete sample video.
+
+The files under `deps/*/exp*.py` are preserved historical experiments rather
+than the recommended entry point. Some of their standalone `main` functions
+still contain the dataset locations used in the original paper experiments;
+use the notebook for the released sample workflow.
+
+## Full LTS dataset
+
+The complete LTS dataset is distributed separately:
+
+- [Google Drive](https://drive.google.com/drive/folders/1M3YsXmIBhsonYSMySTgI016kSXKwoV1j?usp=drive_link)
+- [Project server](http://129.128.243.176/LTS-Dataset/)
+
+The release is split into the following archives: `part1.tar.gz` (13G),
+`part2.tar.gz` (12G), `part3.zip` (24G), `part4.tar.gz` (12G), `part5.zip`
+(7.4G), and `part6.zip` (2.4G). Extract them according to the dataset
+instructions before using the legacy data-generation scripts.
 
 ## Citation
-If you find our dataset and model useful in your research, please consider citing:
-```
+
+```bibtex
 @ARTICLE{10478283,
   author={Dong, Guanfang and Zhao, Chenqiu and Pan, Xichen and Basu, Anup},
-  journal={IEEE Transactions on Image Processing}, 
-  title={Learning Temporal Distribution and Spatial Correlation Toward Universal Moving Object Segmentation}, 
+  journal={IEEE Transactions on Image Processing},
+  title={Learning Temporal Distribution and Spatial Correlation Toward Universal Moving Object Segmentation},
   year={2024},
   volume={33},
-  number={},
   pages={2447-2461},
-  keywords={Videos;Training;Object segmentation;Correlation;Iterative methods;Mathematical models;Deep learning;Moving object segmentation;distribution learning;Bayesian probabilistic model;machine learning},
-  doi={10.1109/TIP.2024.3378473}}
+  doi={10.1109/TIP.2024.3378473}
+}
 ```
 
-## Related Work
-
-If you are interested in our approach to distribution learning, we recommend exploring our previous work in this area. Our earlier research laid the groundwork for the methodologies applied in the current LTS project. Below is a key publication that provides insight into our foundational work on universal background subtraction using arithmetic distribution neural networks:
-
-**Reference:**
-- Zhao, C., Hu, K., & Basu, A. (2022). Universal background subtraction based on arithmetic distribution neural network. *IEEE Transactions on Image Processing*, 31, 2934-2949.
+Related work:
 
 ```bibtex
 @article{zhao2022universal,
@@ -106,13 +139,9 @@ If you are interested in our approach to distribution learning, we recommend exp
 }
 ```
 
-This publication provides valuable insights into the principles and techniques that have influenced the development of our LTS model. We encourage interested readers to delve into this work for a deeper understanding of our approach to segmentation and distribution learning.
+## License and contact
 
+This work is released under the MIT License.
 
-## License
-This work is licensed under the MIT License.
-
-## Contact
-For any queries regarding the dataset or the model, feel free to reach out:
-- Email: guanfang@ualberta.ca
-- Institution: University of Alberta
+For questions about the dataset or models, contact `guanfang@ualberta.ca`
+(University of Alberta).

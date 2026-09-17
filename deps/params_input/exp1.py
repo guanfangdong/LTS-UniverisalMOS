@@ -5,8 +5,7 @@ import numpy as np
 
 class QParams:
     def setParams():
-        return 0;
-
+        return 0
 
     m_params = []
 
@@ -19,7 +18,7 @@ def main(argc, argv):
         print(argv[i])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     argc = len(sys.argv)
     argv = sys.argv
 
