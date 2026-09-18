@@ -8,6 +8,7 @@ env/
 
 # Notebook and test-tool state
 .ipynb_checkpoints/
+executed.ipynb
 .pytest_cache/
 .ruff_cache/
 

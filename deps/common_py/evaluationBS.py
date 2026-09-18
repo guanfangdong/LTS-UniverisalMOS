@@ -9,8 +9,28 @@ import numpy as np
 import torch
 
 
+def normalize_mask(mask):
+    """Return an image-shaped mask with a single label channel.
+
+    CDNet ground-truth files are often stored as RGB PNGs even though all
+    channels carry the same label.  The released LTS notebook mixes those
+    RGB masks with single-channel predictions, so normalize the common
+    ``(height, width, channels)`` representation at the evaluation boundary.
+    Two-dimensional masks and tensors with a different layout are returned
+    unchanged.
+    """
+
+    if mask.ndim == 3 and mask.shape[-1] in (1, 3, 4):
+        return mask[..., 0]
+
+    return mask
+
+
 def evaluation_numpy_entry_torch(prelabs, trulabs):
     """Return ``(TP, FP, TN, FN)`` as NumPy scalar arrays for tensors."""
+
+    prelabs = normalize_mask(prelabs)
+    trulabs = normalize_mask(trulabs)
 
     tp = torch.sum((prelabs == 255) & (trulabs == 255))
     fp = torch.sum((prelabs == 255) & (trulabs == 0))
@@ -29,6 +49,9 @@ def evaluation_numpy_entry_torch(prelabs, trulabs):
 
 def _confusion_counts(prelabs, trulabs):
     """Count the four binary-mask outcomes without changing label semantics."""
+
+    prelabs = normalize_mask(prelabs)
+    trulabs = normalize_mask(trulabs)
 
     # Flatten to scalars before conversion.  The previous (n, 1) indexing
     # raised under NumPy 2.x because ``int(np.array([value]))`` is no longer

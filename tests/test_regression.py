@@ -14,9 +14,11 @@ from deps.common_py.evaluationBS import (
     evaluation_numpy,
     evaluation_numpy_entry,
     evaluation_numpy_entry_torch,
+    normalize_mask,
 )
 from deps.common_py.improcess import quantize
 from deps.common_py.utils import setupSeed
+from deps.demo_sbr import cut_patches_randomly
 from deps.function.arithdis import gaussianpdf, getc_X
 from deps.params_input.params_input import QParams, numcheck
 
@@ -34,6 +36,16 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(evaluation_numpy(self.prediction, self.truth), (0.5, 0.5, 0.5))
         torch_counts = evaluation_numpy_entry_torch(
             torch.from_numpy(self.prediction), torch.from_numpy(self.truth)
+        )
+        self.assertEqual(tuple(int(value) for value in torch_counts), (1, 1, 1, 1))
+
+    def test_rgb_masks_are_reduced_to_the_label_channel(self):
+        rgb_truth = np.repeat(self.truth[..., None], 3, axis=-1)
+        self.assertTrue(np.array_equal(normalize_mask(rgb_truth), self.truth))
+        self.assertEqual(evaluation_numpy_entry(self.prediction, rgb_truth), (1, 1, 1, 1))
+
+        torch_counts = evaluation_numpy_entry_torch(
+            torch.from_numpy(self.prediction), torch.from_numpy(rgb_truth)
         )
         self.assertEqual(tuple(int(value) for value in torch_counts), (1, 1, 1, 1))
 
@@ -61,6 +73,18 @@ class UtilityTests(unittest.TestCase):
         result = getTrainBinMask(mask, radius=1)
         expected = torch.tensor([[255.0, 255.0], [0.0, 255.0]])
         self.assertTrue(torch.equal(result, expected))
+
+
+class DemoDeviceTests(unittest.TestCase):
+    def test_patch_sampler_honors_the_requested_device(self):
+        image = torch.zeros((8, 10, 3), dtype=torch.uint8)
+        mask = torch.zeros((8, 10), dtype=torch.uint8)
+
+        patches = cut_patches_randomly(mask, image, mask, num_pos=2, radius=2, device="cpu")
+
+        self.assertTrue(all(patch.device.type == "cpu" for patch in patches[:3]))
+        self.assertEqual(patches[0].shape, (2, 3, 4, 4))
+        self.assertEqual(patches[1].shape, (2, 4, 4))
 
 
 class CompatibilityTests(unittest.TestCase):

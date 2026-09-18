@@ -51,6 +51,8 @@ and enough GPU/CPU memory are required for a full run.
 ├── test_demo.ipynb               # End-to-end DIDL + SBR demonstration
 ├── deps/
 │   ├── ADNNet_data_plus.py       # Data preparation and DIDL helpers
+│   ├── demo_didl.py               # DIDL models and temporal inference helpers
+│   ├── demo_sbr.py                # SBR U-Net and patch-based refinement helpers
 │   ├── common_py/                # I/O, metrics and image-processing helpers
 │   ├── bayesian/                 # Bayesian refinement implementation
 │   ├── binarymask/               # Training-mask conversion
@@ -72,11 +74,14 @@ models/network_dis_0100.pt
 
 ## Code organisation
 
-The Python code is now importable as the `deps` package. Shared utilities have
-kept their original public function names so the notebook and existing
-experiments remain compatible. The identical files that previously existed in
-both `deps/` and `deps/function/` are now small compatibility entry points; the
-historical variants that have different behaviour remain separate.
+The Python code is now importable as the `deps` package. The notebook is kept
+as a readable orchestration layer: model definitions, patch sampling, mask
+normalization and metric updates live in `deps/demo_didl.py` and
+`deps/demo_sbr.py`. Shared utilities have kept their original public function
+names so existing experiments remain compatible. The identical files that
+previously existed in both `deps/` and `deps/function/` are now small
+compatibility entry points; historical variants that have different behaviour
+remain separate.
 
 The refactor is intentionally behaviour-preserving for the released pipeline:
 the model files, tensor operations, data ordering, output directories and
@@ -92,7 +97,10 @@ python -m unittest discover -s tests -v
 
 The full notebook is the authoritative end-to-end validation because it
 requires the optional image, plotting and Jupyter dependencies and processes
-the complete sample video.
+the complete sample video. The released sample stores some groundtruth masks
+as RGB PNGs; the shared `normalize_mask` helper reduces those equivalent
+channels before DIDL/SBR evaluation. SBR also follows the selected PyTorch
+device instead of assuming CUDA is present.
 
 The files under `deps/*/exp*.py` are preserved historical experiments rather
 than the recommended entry point. Some of their standalone `main` functions
